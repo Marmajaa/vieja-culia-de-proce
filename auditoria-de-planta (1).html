@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Auditoría de Planta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #131516;
+    --bg-vignette: radial-gradient(ellipse at 50% -10%, #1d2022 0%, #131516 55%);
+    --steel: #1e2123;
+    --steel-2: #262a2c;
+    --steel-3: #2f3436;
+    --line: #35393c;
+    --line-soft: #292d2f;
+    --amber: #e8a33d;
+    --amber-soft: #4a3820;
+    --amber-dim: #8a6321;
+    --text: #ece9e2;
+    --text-dim: #93989b;
+    --text-faint: #5e6366;
+    --ok: #8ab876;
+    --ok-bg: #1f2a1c;
+    --ok-line: #3c5233;
+    --bad: #d3705d;
+    --bad-bg: #2c1e1c;
+    --bad-line: #5a3630;
+    --radius: 4px;
+    --radius-lg: 8px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    background-image:var(--bg-vignette);
+    color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .shell{
+    width:100%;
+    max-width:480px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    border-left:1px solid var(--line-soft);
+    border-right:1px solid var(--line-soft);
+    box-shadow: 0 0 60px rgba(0,0,0,0.4);
+  }
+
+  .stripe{
+    height:7px;
+    width:100%;
+    background:repeating-linear-gradient(
+      135deg,
+      var(--amber), var(--amber) 11px,
+      #191a1a 11px, #191a1a 22px
+    );
+    flex-shrink:0;
+  }
+
+  /* ---------- header ---------- */
+  header{
+    padding:20px 20px 16px;
+    border-bottom:1px solid var(--line-soft);
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .badge{
+    width:42px; height:42px;
+    border-radius:50%;
+    background:var(--steel-2);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .badge svg{ width:22px; height:22px; }
+  header .titles{ min-width:0; }
+  header .kicker{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:0.09em;
+    color:var(--amber);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--ok);
+    box-shadow:0 0 6px var(--ok);
+    flex-shrink:0;
+  }
+  header h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:21px;
+    font-weight:700;
+    margin:3px 0 0;
+    letter-spacing:-0.01em;
+  }
+
+  /* ---------- readout + progress ---------- */
+  .readout{
+    display:flex;
+    border-bottom:1px solid var(--line-soft);
+    flex-shrink:0;
+  }
+  .readout > div{
+    flex:1;
+    padding:11px 20px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .readout > div:first-child{ border-right:1px solid var(--line-soft); }
+  .readout .label{
+    font-size:10px;
+    color:var(--text-faint);
+    letter-spacing:0.09em;
+  }
+  .readout .value{
+    font-size:21px;
+    font-weight:500;
+    color:var(--text);
+    margin-top:2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .readout .value.amber{ color:var(--amber); }
+
+  .progress{
+    display:flex;
+    gap:4px;
+    padding:12px 20px 14px;
+    border-bottom:1px solid var(--line-soft);
+    flex-shrink:0;
+  }
+  .progress .seg{
+    flex:1;
+    height:4px;
+    border-radius:2px;
+    background:var(--line);
+    transition:background .3s ease;
+  }
+  .progress .seg.done{ background:var(--amber); }
+  .progress .seg.now{ background:var(--text-dim); position:relative; overflow:hidden; }
+  .progress .seg.now::after{
+    content:"";
+    position:absolute; inset:0;
+    background:var(--amber);
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{opacity:.25;} 50%{opacity:.9;} }
+
+  /* ---------- main / card ---------- */
+  main{
+    flex:1;
+    padding:22px 20px 20px;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .fade-in{ animation: fadeIn .35s ease; }
+  @keyframes fadeIn{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .clipboard{
+    background:var(--steel);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    padding:0;
+    position:relative;
+    box-shadow: 0 10px 24px -14px rgba(0,0,0,0.6);
+    overflow:hidden;
+  }
+  .clipboard .bar{
+    height:4px;
+    width:100%;
+    background:var(--amber-dim);
+  }
+  .clipboard .bar.ok{ background:var(--ok); }
+  .clipboard .bar.bad{ background:var(--bad); }
+
+  .clipboard .head{
+    padding:16px 18px 12px;
+    border-bottom:1px solid var(--line-soft);
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .clipboard .head .who .mineral{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:17px;
+    font-weight:600;
+  }
+  .clipboard .head .who .equipo{
+    font-size:12.5px;
+    color:var(--text-dim);
+    margin-top:2px;
+  }
+  .clipboard .head .caseno{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--text-faint);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:3px 9px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+
+  .clipboard .section{
+    padding:12px 18px;
+    border-bottom:1px dashed var(--line-soft);
+  }
+  .clipboard .section:last-child{ border-bottom:none; }
+  .clipboard .section .tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    letter-spacing:0.09em;
+    color:var(--text-faint);
+    margin:0 0 6px;
+  }
+  .clipboard .datos{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:#cfcdc4;
+    line-height:1.6;
+  }
+  .clipboard .proc{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    white-space:pre-line;
+    line-height:1.65;
+    color:#d7d5cc;
+  }
+  .clipboard .resultado{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    font-weight:500;
+    color:var(--text);
+  }
+
+  .prompt{
+    font-size:13.5px;
+    color:var(--text-dim);
+    margin:22px 0 11px;
+    text-align:center;
+  }
+
+  .grid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  button{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+    font-weight:500;
+    color:var(--text);
+    background:var(--steel-2);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 12px;
+    min-height:50px;
+    cursor:pointer;
+    -webkit-appearance:none;
+    transition: transform .08s ease, background .15s ease, border-color .15s ease;
+  }
+  button:active{ background:var(--steel-3); transform:scale(0.97); }
+
+  button.primary{
+    background:var(--amber);
+    border-color:var(--amber);
+    color:#1c1400;
+    font-weight:600;
+  }
+  button.primary:active{ background:var(--amber-dim); }
+
+  button.tipo{ font-size:13px; text-align:left; }
+
+  button.wide{ grid-column: 1 / -1; }
+
+  .feedback{
+    border-radius:var(--radius-lg);
+    padding:15px 17px;
+    margin:22px 0 16px;
+    border:1px solid;
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+  }
+  .feedback.ok{ background:var(--ok-bg); border-color:var(--ok-line); }
+  .feedback.bad{ background:var(--bad-bg); border-color:var(--bad-line); }
+  .feedback .icon{
+    width:22px; height:22px; flex-shrink:0; margin-top:1px;
+  }
+  .feedback .icon.ok{ color:var(--ok); }
+  .feedback .icon.bad{ color:var(--bad); }
+  .feedback .body .verdict{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    margin:0 0 5px;
+  }
+  .feedback.ok .verdict{ color:var(--ok); }
+  .feedback.bad .verdict{ color:var(--bad); }
+  .feedback .body p{
+    font-size:13px;
+    color:var(--text-dim);
+    margin:0;
+    line-height:1.55;
+  }
+
+  /* ---------- intro screen ---------- */
+  .intro h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:19px;
+    margin:2px 0 10px;
+  }
+  .intro p{
+    font-size:13.5px;
+    color:var(--text-dim);
+    line-height:1.6;
+    margin:0 0 16px;
+  }
+  .rule-list{
+    list-style:none;
+    margin:0 0 22px;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .rule-list li{
+    display:flex;
+    gap:11px;
+    align-items:flex-start;
+    font-size:13px;
+    color:var(--text-dim);
+    line-height:1.5;
+  }
+  .rule-list .num{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--amber);
+    background:var(--amber-soft);
+    border-radius:50%;
+    width:20px; height:20px;
+    flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    margin-top:1px;
+  }
+  .score-key{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+    background:var(--steel);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    padding:14px 16px;
+    margin-bottom:22px;
+  }
+  .score-key .row{
+    display:flex;
+    justify-content:space-between;
+    font-size:12.5px;
+  }
+  .score-key .row span:first-child{ color:var(--text-dim); }
+  .score-key .row span:last-child{
+    font-family:'IBM Plex Mono', monospace;
+    color:var(--text);
+  }
+
+  /* ---------- final screen ---------- */
+  .final{ text-align:center; padding:8px 4px 4px; }
+  .final .rank{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.09em;
+    color:var(--amber);
+    margin-bottom:6px;
+  }
+  .final .big{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:46px;
+    font-weight:700;
+    color:var(--text);
+    margin:2px 0 4px;
+  }
+  .final .big span{ color:var(--amber); }
+  .final .sub{ color:var(--text-dim); font-size:13px; margin:0 0 22px; }
+
+  .breakdown{
+    display:flex;
+    flex-direction:column;
+    gap:1px;
+    background:var(--line-soft);
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    overflow:hidden;
+    margin-bottom:22px;
+    text-align:left;
+  }
+  .breakdown .row{
+    background:var(--steel);
+    padding:11px 16px;
+    display:flex;
+    justify-content:space-between;
+    font-size:13px;
+  }
+  .breakdown .row span:first-child{ color:var(--text-dim); }
+  .breakdown .row span:last-child{
+    font-family:'IBM Plex Mono', monospace;
+    color:var(--text);
+  }
+
+  .spacer{ flex:1; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="stripe"></div>
+  <header>
+    <div class="badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="color:var(--amber)">
+        <path d="M4 15 L9 5 L14 12 L17 7 L20 15 Z" stroke-linejoin="round"/>
+        <path d="M3 19 H21" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="titles">
+      <div class="kicker"><span class="dot"></span>SIMULACIÓN — CONMINUCIÓN</div>
+      <h1>Auditoría de Planta</h1>
+    </div>
+  </header>
+
+  <div class="readout" id="readout-wrap">
+    <div>
+      <div class="label">REPORTE</div>
+      <div class="value" id="readout-turno">— / —</div>
+    </div>
+    <div>
+      <div class="label">PUNTAJE</div>
+      <div class="value amber" id="readout-score">00</div>
+    </div>
+  </div>
+  <div class="progress" id="progress"></div>
+
+  <main id="main"></main>
+</div>
+
+<script>
+const cards = [
+  {mineral:"Cuarzo", equipo:"Molino de bolas",
+   datos:"F80 2500 µm · P80 obj. 100 µm · Wi 13 kWh/t",
+   proc:"Rango de molienda fina, se aplica Kick:\nW = Wi · ln(F80/P80) = 13 · ln(25) = 41.9 kWh/t",
+   resultado:"41.9 kWh/t — turno aprobado",
+   error:true, tipo:"ley", correccion:"Para este rango de tamaños corresponde Bond, no Kick. Kick se usa en trituración gruesa."},
+
+  {mineral:"Caliza", equipo:"Chancador de mandíbula",
+   datos:"F80 50 mm · P80 10 mm · Wi 11 kWh/t",
+   proc:"Trituración gruesa, se aplica Bond:\nW = 10·Wi·(1/√P80 − 1/√F80) = 19.3 kWh/t",
+   resultado:"19.3 kWh/t — turno aprobado",
+   error:false, tipo:"—", correccion:"El cálculo, la ley y las unidades son correctas. No hay error."},
+
+  {mineral:"Granito", equipo:"Molino de barras",
+   datos:"F80 8000 µm · P80 800 µm · Wi 15 kWh/t",
+   proc:"Se aplica Bond:\nW = 10·15·(1/√800 − 1/√8000) = 1.8 kWh/t",
+   resultado:"1.8 kWh/t — turno aprobado",
+   error:true, tipo:"unidades", correccion:"El resultado es demasiado bajo para el salto de tamaño reportado: hay una inconsistencia dimensional en el cálculo que debe revisarse antes de aprobar el turno."},
+
+  {mineral:"Hematita", equipo:"Molino de bolas",
+   datos:"F80 3000 µm · P80 150 µm · Wi 12.8 kWh/t",
+   proc:"Se aplica Bond:\nW = 10·12.8·(1/√150 − 1/√3000) = 8.1 kWh/t",
+   resultado:"8.1 kWh/t — turno aprobado",
+   error:false, tipo:"—", correccion:"El procedimiento y el resultado son correctos."},
+
+  {mineral:"Cobre porfídico", equipo:"Chancador giratorio",
+   datos:"F80 400 mm · P80 40 mm · Wi 14 kWh/t",
+   proc:"Se aplica Rittinger (superficie nueva creada):\nW = Kr·(1/P80 − 1/F80), asumiendo Kr = Wi",
+   resultado:"turno aprobado sin valor numérico reportado",
+   error:true, tipo:"ley", correccion:"Para chancado grueso corresponde Bond o Kick, no Rittinger. Además falta el desarrollo numérico completo."},
+
+  {mineral:"Magnetita", equipo:"Molino de bolas",
+   datos:"F80 100 µm · P80 2500 µm · Wi 13.5 kWh/t",
+   proc:"Se aplica Bond:\nW = 10·13.5·(1/√2500 − 1/√100) = -11.3 kWh/t",
+   resultado:"-11.3 kWh/t — turno aprobado",
+   error:true, tipo:"invertido", correccion:"F80 y P80 están invertidos: el producto no puede ser más grueso que la alimentación."},
+
+  {mineral:"Andesita", equipo:"Chancador de cono",
+   datos:"F80 120 mm · P80 30 mm · Wi 16 kWh/t",
+   proc:"Se aplica Bond:\nW = 10·16·(1/√30 − 1/√120) = 14.6 kWh/t",
+   resultado:"14.6 kWh/t — turno aprobado",
+   error:false, tipo:"—", correccion:"Cálculo correcto, sin errores."},
+
+  {mineral:"Molibdenita", equipo:"Molino de bolas",
+   datos:"F80 4000 µm · P80 200 µm · Wi 12 kWh/t",
+   proc:"Se aplica Bond:\nW = 10·12·(1/√200 − 1/√4000) = 6.6 kWh/t\nConclusión: no se logró el P80 objetivo, turno rechazado",
+   resultado:"6.6 kWh/t — turno rechazado",
+   error:true, tipo:"conclusion", correccion:"El cálculo de energía es correcto, pero rechazar el turno no tiene relación con ese resultado: la conclusión contradice el propio cálculo."}
+];
+
+const tipoLabels = {
+  ley: "Ley mal aplicada",
+  unidades: "Error de unidades",
+  invertido: "Dato invertido",
+  aritmetico: "Error aritmético",
+  conclusion: "Conclusión contradictoria"
+};
+
+const iconOk = '<svg class="icon ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const iconBad = '<svg class="icon bad" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>';
+
+let idx = 0, score = 0, phase = "intro", lastOk = false;
+let hits = {si_no:0, tipo:0, fallos:0};
+const main = document.getElementById('main');
+const readoutWrap = document.getElementById('readout-wrap');
+const progressEl = document.getElementById('progress');
+
+function buildProgress(){
+  progressEl.innerHTML = cards.map((_,i)=>{
+    let cls = 'seg';
+    if (i < idx) cls += ' done';
+    else if (i === idx && phase !== 'intro') cls += ' now';
+    return '<div class="' + cls + '"></div>';
+  }).join('');
+}
+
+function updateReadout(){
+  if (phase === 'intro'){
+    document.getElementById('readout-turno').textContent = '— / ' + String(cards.length).padStart(2,'0');
+  } else {
+    document.getElementById('readout-turno').textContent =
+      String(idx+1).padStart(2,'0') + ' / ' + String(cards.length).padStart(2,'0');
+  }
+  document.getElementById('readout-score').textContent = String(score).padStart(2,'0');
+  buildProgress();
+}
+
+function renderIntro(){
+  main.innerHTML =
+    '<div class="fade-in">'
+    + '<h2 class="intro-h2" style="font-family:\'Space Grotesk\',sans-serif;font-size:19px;margin:2px 0 10px;">Bienvenido, auditor</h2>'
+    + '<p style="font-size:13.5px;color:var(--text-dim);line-height:1.6;margin:0 0 18px;">Cada turno de la planta genera un reporte con un cálculo de conminución ya resuelto. Tu trabajo es revisarlo antes de que se apruebe.</p>'
+    + '<ul class="rule-list">'
+      + '<li><span class="num">1</span>Lee los datos y el procedimiento del reporte.</li>'
+      + '<li><span class="num">2</span>Decide si el cálculo tiene un error o está correcto.</li>'
+      + '<li><span class="num">3</span>Si hay error, identifica de qué tipo es.</li>'
+      + '<li><span class="num">4</span>Revisa la corrección y pasa al siguiente reporte.</li>'
+    + '</ul>'
+    + '<div class="score-key">'
+      + '<div class="row"><span>Acierto sí/no hay error</span><span>+1</span></div>'
+      + '<div class="row"><span>Acierto tipo de error</span><span>+2</span></div>'
+      + '<div class="row"><span>Respuesta equivocada</span><span>−1</span></div>'
+    + '</div>'
+    + '<div class="grid2"><button class="primary wide" onclick="startGame()">Comenzar auditoría</button></div>'
+    + '</div>';
+}
+
+function render(){
+  updateReadout();
+  const c = cards[idx];
+  let html = '<div class="fade-in">';
+
+  let barClass = '';
+  if (phase === 'feedback') barClass = lastOk ? 'ok' : 'bad';
+
+  html += '<div class="clipboard">'
+    + '<div class="bar ' + barClass + '"></div>'
+    + '<div class="head">'
+      + '<div class="who"><div class="mineral">' + c.mineral + '</div><div class="equipo">' + c.equipo + '</div></div>'
+      + '<div class="caseno">CASO Nº ' + String(idx+1).padStart(3,'0') + '</div>'
+    + '</div>'
+    + '<div class="section"><div class="tag">DATOS DE ENTRADA</div><div class="datos">' + c.datos + '</div></div>'
+    + '<div class="section"><div class="tag">PROCEDIMIENTO APLICADO</div><div class="proc">' + c.proc + '</div></div>'
+    + '<div class="section"><div class="tag">RESULTADO REGISTRADO</div><div class="resultado">' + c.resultado + '</div></div>'
+    + '</div>';
+
+  if (phase === "ask"){
+    html += '<p class="prompt">¿El reporte tiene un error?</p>'
+      + '<div class="grid2">'
+      + '<button onclick="answer(true)">Hay error</button>'
+      + '<button onclick="answer(false)">Sin error</button>'
+      + '</div>';
+  } else if (phase === "tipo"){
+    html += '<p class="prompt">¿Cuál es el tipo de error?</p>'
+      + '<div class="grid2">'
+      + Object.entries(tipoLabels).map(([k,v]) =>
+          '<button class="tipo" onclick="answerTipo(\'' + k + '\')">' + v + '</button>').join('')
+      + '</div>';
+  } else if (phase === "feedback"){
+    html += '<div class="feedback ' + (lastOk ? 'ok' : 'bad') + '">'
+      + (lastOk ? iconOk : iconBad)
+      + '<div class="body"><p class="verdict">' + (lastOk ? 'Correcto' : 'No exactamente') + '</p><p>' + c.correccion + '</p></div>'
+      + '</div>';
+    if (idx < cards.length - 1){
+      html += '<div class="grid2"><button class="primary wide" onclick="next()">Siguiente reporte →</button></div>';
+    } else {
+      html += renderFinalInline();
+    }
+  }
+
+  html += '</div>';
+  main.innerHTML = html;
+}
+
+function rankFor(pct){
+  if (pct >= 90) return "AUDITOR SENIOR";
+  if (pct >= 70) return "AUDITOR CERTIFICADO";
+  if (pct >= 45) return "AUDITOR EN FORMACIÓN";
+  return "REVISAR PROCEDIMIENTOS";
+}
+
+function renderFinalInline(){
+  const maxScore = cards.length * 3;
+  const pct = Math.max(0, Math.round((score / maxScore) * 100));
+  return '<div class="final">'
+    + '<div class="rank">' + rankFor(pct) + '</div>'
+    + '<div class="big">' + score + '<span> / ' + maxScore + '</span></div>'
+    + '<p class="sub">' + pct + '% de desempeño en ' + cards.length + ' reportes auditados</p>'
+    + '<div class="breakdown">'
+      + '<div class="row"><span>Detección sí/no correcta</span><span>' + hits.si_no + ' / ' + cards.length + '</span></div>'
+      + '<div class="row"><span>Tipo de error correcto</span><span>' + hits.tipo + ' / ' + cards.filter(c=>c.error).length + '</span></div>'
+      + '<div class="row"><span>Respuestas equivocadas</span><span>' + hits.fallos + '</span></div>'
+    + '</div>'
+    + '<div class="grid2"><button class="primary wide" onclick="restart()">Jugar de nuevo</button></div>'
+    + '</div>';
+}
+
+function startGame(){
+  phase = "ask";
+  render();
+}
+
+function answer(saysError){
+  const c = cards[idx];
+  if (saysError === c.error){
+    score += 1;
+    hits.si_no += 1;
+    if (c.error){ phase = "tipo"; render(); return; }
+    lastOk = true;
+  } else {
+    score -= 1;
+    hits.fallos += 1;
+    lastOk = false;
+  }
+  phase = "feedback";
+  render();
+}
+
+function answerTipo(tipo){
+  const c = cards[idx];
+  if (tipo === c.tipo){ score += 2; hits.tipo += 1; lastOk = true; }
+  else { score -= 1; hits.fallos += 1; lastOk = false; }
+  phase = "feedback";
+  render();
+}
+
+function next(){
+  idx += 1;
+  phase = "ask";
+  render();
+}
+
+function restart(){
+  idx = 0; score = 0; phase = "ask";
+  hits = {si_no:0, tipo:0, fallos:0};
+  render();
+}
+
+renderIntro();
+updateReadout();
+</script>
+</body>
+</html>
